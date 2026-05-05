@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Community Gardens – Aberdeen & North East Scotland</title>
+  <style>
+    body { margin:0; font-family: Arial, sans-serif; background:#f3f7fa; color:#123; }
+    header { background:#1d3557; color:#fff; padding:12px 16px; }
+    .layout { display:grid; grid-template-columns:340px 1fr; gap:12px; padding:12px; }
+    .panel, .map-card { background:#fff; border:1px solid #d7e1ea; border-radius:10px; padding:12px; }
+    .stats { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px; }
+    .stat { border:1px solid #d7e1ea; border-radius:8px; padding:8px; background:#f9fcff; }
+    .stat strong { font-size:1.15rem; display:block; }
+    label { font-size:.85rem; color:#456; display:block; margin:8px 0 4px; }
+    select,input { width:100%; padding:8px; border:1px solid #c9d7e5; border-radius:8px; }
+    #garden-list { max-height:240px; overflow:auto; padding-left:18px; }
+    .legend { font-size:.86rem; margin:8px 0; }
+    .sw { width:10px; height:10px; border-radius:50%; display:inline-block; margin-right:6px; }
+    #map-wrap { position:relative; }
+    #map-svg { width:100%; height:74vh; min-height:560px; background:#e9f2f8; border-radius:8px; border:1px solid #c8d9e6; }
+    #tooltip { position:absolute; display:none; background:#fff; border:1px solid #a9bfd2; border-radius:8px; padding:8px; max-width:280px; font-size:.85rem; pointer-events:none; box-shadow:0 4px 14px rgba(0,0,0,.12); }
+    @media (max-width: 920px) { .layout { grid-template-columns:1fr; } #map-svg{height:60vh;min-height:420px;} }
+  </style>
+</head>
+<body>
+  <header>
+    <h2 style="margin:0">Community Gardens in Aberdeen & North East Scotland</h2>
+    <div style="opacity:.9">Offline interactive visualization (no external libraries required)</div>
+  </header>
+  <main class="layout">
+    <aside class="panel">
+      <div class="stats">
+        <div class="stat">Visible gardens<strong id="count">0</strong></div>
+        <div class="stat">Volunteers<strong id="vols">0</strong></div>
+        <div class="stat">Areas covered<strong id="areas">0</strong></div>
+        <div class="stat">Avg open days<strong id="open">0</strong></div>
+      </div>
+      <label for="region">Area</label><select id="region"><option value="all">All areas</option></select>
+      <label for="feature">Feature</label><select id="feature"><option value="all">All features</option></select>
+      <label for="search">Search</label><input id="search" placeholder="Type garden name" />
+      <div class="legend" id="legend"></div>
+      <h4>Visible gardens</h4>
+      <ul id="garden-list"></ul>
+    </aside>
+
+    <section class="map-card">
+      <div id="map-wrap">
+        <svg id="map-svg" viewBox="0 0 900 680" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Schematic map of North East Scotland community gardens">
+          <defs>
+            <linearGradient id="sea" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#d7ebf7"/><stop offset="100%" stop-color="#bedff1"/>
+            </linearGradient>
+          </defs>
+          <rect x="0" y="0" width="900" height="680" fill="url(#sea)"/>
+          <path d="M120 40 L300 20 L560 40 L760 80 L860 170 L835 280 L860 410 L840 580 L710 650 L470 640 L310 620 L180 560 L115 470 L90 350 L95 220 Z" fill="#d7e8cf" stroke="#9ab48f" stroke-width="3"/>
+          <path d="M770 85 L860 170 L835 280 L860 410 L840 580" fill="none" stroke="#7ba8c7" stroke-width="6" stroke-linecap="round" opacity=".8"/>
+          <g id="points"></g>
+          <text x="145" y="90" font-size="15" fill="#3a5">Moray</text>
+          <text x="420" y="300" font-size="15" fill="#3a5">Aberdeenshire</text>
+          <text x="670" y="310" font-size="15" fill="#3a5">Aberdeen City</text>
+        </svg>
+        <div id="tooltip"></div>
+      </div>
+    </section>
+  </main>
+<script>
+const gardens = [
+  { name:"Torry Community Garden", area:"Aberdeen City", lat:57.1376, lng:-2.0838, volunteers:36, openDays:4, feature:"Raised beds", focus:"Family growing", note:"Weekly volunteer sessions." },
+  { name:"Seaton Backies", area:"Aberdeen City", lat:57.1709, lng:-2.0946, volunteers:58, openDays:5, feature:"Polytunnel", focus:"Heritage crops", note:"Long-running local food project." },
+  { name:"Duthie Park Learning Garden", area:"Aberdeen City", lat:57.1313, lng:-2.0963, volunteers:28, openDays:6, feature:"Education hub", focus:"Youth workshops", note:"School and community sessions." },
+  { name:"Stonehaven Community Garden", area:"Aberdeenshire", lat:56.9652, lng:-2.2118, volunteers:41, openDays:4, feature:"Wildflower strips", focus:"Pollinator support", note:"Food + habitat beds." },
+  { name:"Inverurie Green Patch", area:"Aberdeenshire", lat:57.2854, lng:-2.3781, volunteers:33, openDays:3, feature:"Orchard", focus:"Fruit trees", note:"Seasonal community harvest." },
+  { name:"Peterhead Growing Together", area:"Aberdeenshire", lat:57.5058, lng:-1.7844, volunteers:25, openDays:3, feature:"Coastal beds", focus:"Food resilience", note:"Drop-in gardening sessions." },
+  { name:"Elgin Community Plot", area:"Moray", lat:57.6508, lng:-3.3175, volunteers:30, openDays:4, feature:"Seed library", focus:"Seed saving", note:"Beginner sessions + swaps." },
+  { name:"Huntly Community Garden", area:"Aberdeenshire", lat:57.4464, lng:-2.7875, volunteers:22, openDays:2, feature:"Therapeutic space", focus:"Mental health", note:"Guided quiet sessions." },
+  { name:"Fraserburgh Roots Project", area:"Aberdeenshire", lat:57.6948, lng:-2.0044, volunteers:27, openDays:3, feature:"Rainwater system", focus:"Climate adaptation", note:"Water-smart growing demo." },
+  { name:"Banchory Edible Garden", area:"Aberdeenshire", lat:57.0503, lng:-2.4944, volunteers:20, openDays:2, feature:"Accessible beds", focus:"Inclusive gardening", note:"All-ages and mobility-friendly." }
+];
+const colors={"Aberdeen City":"#2a9d8f","Aberdeenshire":"#e76f51","Moray":"#457b9d"};
+const latMin=56.9, latMax=57.8, lngMin=-3.5, lngMax=-1.6;
+const px=(lat,lng)=>({x:130+((lng-lngMin)/(lngMax-lngMin))*700,y:620-((lat-latMin)/(latMax-latMin))*520});
+const pointLayer=document.getElementById('points'), tooltip=document.getElementById('tooltip');
+const region=document.getElementById('region'), feature=document.getElementById('feature'), search=document.getElementById('search');
+const list=document.getElementById('garden-list');
+
+for (const r of [...new Set(gardens.map(g=>g.area))].sort()) region.append(new Option(r,r));
+for (const f of [...new Set(gardens.map(g=>g.feature))].sort()) feature.append(new Option(f,f));
+document.getElementById('legend').innerHTML = Object.entries(colors).map(([k,v])=>`<span class="sw" style="background:${v}"></span>${k}`).join('<br>');
+
+function render(){
+  const fr=region.value, ff=feature.value, q=search.value.trim().toLowerCase();
+  const filtered=gardens.filter(g=>(fr==='all'||g.area===fr)&&(ff==='all'||g.feature===ff)&&(!q||g.name.toLowerCase().includes(q)));
+  pointLayer.innerHTML='';
+  for(const g of filtered){
+    const p=px(g.lat,g.lng);
+    const c=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    c.setAttribute('cx',p.x); c.setAttribute('cy',p.y); c.setAttribute('r',8);
+    c.setAttribute('fill',colors[g.area]||'#333'); c.setAttribute('stroke','#123'); c.setAttribute('stroke-width','1');
+    c.style.cursor='pointer';
+    c.addEventListener('mousemove',(e)=>{ tooltip.style.display='block'; tooltip.style.left=(e.offsetX+20)+'px'; tooltip.style.top=(e.offsetY+20)+'px';
+      tooltip.innerHTML=`<strong>${g.name}</strong><br>${g.area}<br>Feature: ${g.feature}<br>Focus: ${g.focus}<br>Volunteers: ${g.volunteers}<br>Open days/week: ${g.openDays}<br><small>${g.note}</small>`;});
+    c.addEventListener('mouseleave',()=>tooltip.style.display='none');
+    pointLayer.append(c);
+  }
+  list.innerHTML = filtered.map(g=>`<li><strong>${g.name}</strong> — ${g.area} · ${g.feature}</li>`).join('') || '<li>No matches.</li>';
+  document.getElementById('count').textContent=filtered.length;
+  document.getElementById('vols').textContent=filtered.reduce((a,b)=>a+b.volunteers,0);
+  document.getElementById('areas').textContent=new Set(filtered.map(g=>g.area)).size;
+  document.getElementById('open').textContent=filtered.length?(filtered.reduce((a,b)=>a+b.openDays,0)/filtered.length).toFixed(1):'0';
+}
+[region,feature].forEach(el=>el.addEventListener('change',render)); search.addEventListener('input',render); render();
+</script>
+</body>
+</html>
